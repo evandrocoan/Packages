@@ -22,6 +22,8 @@ file_extensions:
   - gypi
   - Snakefile
   - wscript
+  - AMBuilder
+  - AMBuildScript
 first_line_match: ^#!\s*/.*\bpython(\d(\.\d)?)?\b
 scope: source.python
 
