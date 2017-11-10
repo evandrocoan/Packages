@@ -98,21 +98,24 @@ contexts:
       push:
         - meta_scope: meta.statement.import.python
         - include: line-continuation-or-pop
-        - include: import-alias
-        - include: qualified-name
         - match: ','
           scope: punctuation.separator.import-list.python
+        - match: \.
+          scope: invalid.illegal.unexpected-relative-import.python
+        - include: import-alias
+        - include: qualified-name
         - match: (?=\S)
           pop: true
     - match: \b(from)\b
       scope: keyword.control.import.from.python
       push:
         - meta_scope: meta.statement.import.python
-          meta_content_scope: meta.import-source.python
+        - meta_content_scope: meta.import-source.python
         - include: line-continuation-or-pop
         - match: \b(import)\b
           scope: keyword.control.import.python
           set:
+            - meta_scope: meta.statement.import.python
             - include: line-continuation-or-pop
             - match: ' *(\()'
               captures:
@@ -135,9 +138,7 @@ contexts:
                   pop: true
             - match: (?=\S)
               pop: true
-        - include: qualified-name
-        - match: (\.)
-          scope: punctuation.accessor.dot.python
+        - include: import-from-name
         - match: (?=\S)
           pop: true
 
@@ -154,6 +155,23 @@ contexts:
   import-alias:
     - match: \b(as)\b
       scope: keyword.control.import.as.python
+
+  import-from-name:
+    - match: (?=(\. *)?{{path}})
+      push:
+        - meta_scope: meta.import-path.python
+        - match: '{{identifier}}'
+          scope: meta.import-name.python
+        - match: \s*(\.) *({{identifier}})
+          captures:
+            1: punctuation.accessor.dot.python
+            2: meta.import-name.python
+        - match: \ *(\. *\S+) # matches and consumes the remainder of "abc.123" or "abc.+"
+          captures:
+            1: invalid.illegal.name.python
+          pop: true
+        - match: ''
+          pop: true
 
   block-statements:
     # async for ... in ...:
@@ -372,28 +390,39 @@ contexts:
   numbers:
     # https://docs.python.org/3/reference/lexical_analysis.html#numeric-literals
     # hexadecimal
-    - match: \b(?i)(?:0x\h*)(L) # py2
+    - match: \b(?i)(0x)\h*(L) # py2
       scope: constant.numeric.integer.long.hexadecimal.python
       captures:
-        1: storage.type.numeric.long.python
-    - match: \b(?i)(0x(_?\h)+)
+        1: punctuation.definition.numeric.hexadecimal.python
+        2: storage.type.numeric.long.python
+    - match: \b(?i)(0x)(_?\h)+
       scope: constant.numeric.integer.hexadecimal.python
+      captures:
+        1: punctuation.definition.numeric.hexadecimal.python
     # octal
-    - match: \b(?i)0(?:o|[0-7])[0-7]*(L) # py2
+    - match: \b(?i)(0o?)(?=o|[0-7])[0-7]*(L) # py2
       scope: constant.numeric.integer.long.octal.python
       captures:
-        1: storage.type.numeric.long.python
-    - match: \b(?i)0[0-7]+ # py2
+        1: punctuation.definition.integer.octal.python
+        2: storage.type.numeric.long.python
+    - match: \b(?i)(0)[0-7]+ # py2
       scope: constant.numeric.integer.octal.python
-    - match: \b(?i)0o(_?[0-7])+
+      captures:
+        1: punctuation.definition.numeric.octal.python
+    - match: \b(?i)(0o)(_?[0-7])+
       scope: constant.numeric.integer.octal.python
+      captures:
+        1: punctuation.definition.numeric.octal.python
     # binary
-    - match: \b(?i)0b[01]*(L) # py2
+    - match: \b(?i)(0b)[01]*(L) # py2
       scope: constant.numeric.integer.long.binary.python
       captures:
-        1: storage.type.numeric.long.python
-    - match: \b(?i)0b(_?[01])*
+        1: punctuation.definition.numeric.binary.python
+        2: storage.type.numeric.long.python
+    - match: \b(?i)(0b)(_?[01])*
       scope: constant.numeric.integer.binary.python
+      captures:
+        1: punctuation.definition.numeric.binary.python
     # complex
     - match: (?i){{digitpart}}?(\.){{digitpart}}(?:e[\-\+]?{{digitpart}})?(j) # mandatory fraction
       scope: constant.numeric.complex.python
@@ -453,7 +482,7 @@ contexts:
         2: keyword.control.flow.yield-from.python
 
   assignments:
-    - match: \+=|-=|\*=|/=|//=|%=|&=|\|=|\^=|>>=|<<=|\*\*=
+    - match: \+=|-=|\*=|/=|//=|%=|@=|&=|\|=|\^=|>>=|<<=|\*\*=
       scope: keyword.operator.assignment.augmented.python
     - match: '=(?!=)'
       scope: keyword.operator.assignment.python
@@ -815,6 +844,8 @@ contexts:
     - match: '(?={{identifier}})'
       push:
         - include: name-specials
+        - match: '\b_*\p{Lu}{3,}[\p{Lu}_]*\b' # require 3 upper-case letters for undotted names
+          scope: variable.other.constant.python
         - include: generic-names
         - match: ''
           pop: true
@@ -825,6 +856,8 @@ contexts:
         1: punctuation.accessor.dot.python
       push:
         - include: dotted-name-specials
+        - match: '\b_*\p{Lu}+[\p{Lu}_]*\b'
+          scope: variable.other.constant.python
         - include: generic-names
         - match: ''
           pop: true
@@ -913,6 +946,8 @@ contexts:
 
   language-variables:
     - match: \b(self|cls)\b
+      scope: variable.language.python
+    - match: _(?!{{identifier_continue}})
       scope: variable.language.python
 
   line-continuation:
@@ -1013,8 +1048,8 @@ contexts:
           2: punctuation.definition.comment.begin.python
         set:
           - meta_scope: comment.block.documentation.python
-          - include: escaped-char
           - include: escaped-unicode-char
+          - include: escaped-char
           - match: '\2'
             scope: punctuation.definition.comment.end.python
             pop: true
@@ -1034,6 +1069,8 @@ contexts:
         1: constant.character.escape.hex.python
         2: constant.character.escape.octal.python
         3: constant.character.escape.python
+    - match: \\.  # deprecated in 3.6 and will eventually be a syntax error
+      scope: invalid.deprecated.character.escape.python
 
   escaped-unicode-char:
     - match: '(\\U\h{8})|(\\u\h{4})|(\\N\{[a-zA-Z ]+\})'
@@ -1397,8 +1434,8 @@ contexts:
           with_prototype:
             - match: '(?="|\n)'
               pop: true
-            - include: escaped-char
             - include: escaped-unicode-char
+            - include: escaped-char
             - include: line-continuation-inside-string
             - include: constant-placeholder
     # Single-line string, unicode or not
@@ -1411,8 +1448,8 @@ contexts:
         - match: '"'
           scope: punctuation.definition.string.end.python
           set: after-expression
-        - include: escaped-char
         - include: escaped-unicode-char
+        - include: escaped-char
         - include: line-continuation-inside-string
         - include: constant-placeholder
     # Single-line string, bytes
@@ -1468,8 +1505,8 @@ contexts:
               with_prototype:
                 - match: (?=''')
                   pop: true
-                - include: escaped-char
                 - include: escaped-unicode-char
+                - include: escaped-char
                 - include: constant-placeholder
         - match: '(?=\S)'
           set:
@@ -1538,8 +1575,8 @@ contexts:
               with_prototype:
                 - match: (?=''')
                   pop: true
-                - include: escaped-char
                 - include: escaped-unicode-char
+                - include: escaped-char
                 - include: constant-placeholder
         - match: '(?=\S)'
           set:
@@ -1547,8 +1584,8 @@ contexts:
             - match: "'''"
               scope: punctuation.definition.string.end.python
               set: after-expression
-            - include: escaped-char
             - include: escaped-unicode-char
+            - include: escaped-char
             - include: constant-placeholder
     # Triple-quoted string, bytes, no syntax embedding
     - match: ([bB])(''')
@@ -1680,8 +1717,8 @@ contexts:
           with_prototype:
             - match: '(?=''|\n)'
               pop: true
-            - include: escaped-char
             - include: escaped-unicode-char
+            - include: escaped-char
             - include: line-continuation-inside-string
             - include: constant-placeholder
     # Single-line string, unicode or not
@@ -1694,8 +1731,8 @@ contexts:
         - match: "'"
           scope: punctuation.definition.string.end.python
           set: after-expression
-        - include: escaped-char
         - include: escaped-unicode-char
+        - include: escaped-char
         - include: line-continuation-inside-string
         - include: constant-placeholder
     # Single-line string, bytes

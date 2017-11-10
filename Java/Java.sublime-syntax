@@ -302,8 +302,72 @@ contexts:
       scope: constant.language.java
     - match: \b(this|super)\b
       scope: variable.language.java
-    - match: '\b((0(x|X)[0-9a-fA-F]*)|(([0-9]+\.?[0-9]*)|(\.[0-9]+))((e|E)(\+|-)?[0-9]+)?)([LlFfUuDd]|UL|ul)?\b'
-      scope: constant.numeric.java
+    # Trailing underscores are allowed to prevent numbers from flickering while typing
+    - match: |-
+        (?x)
+        \b(0[bB])
+        (?!_)[01_]*[01]
+        (?:_*|([Ll])?)\b
+      scope: constant.numeric.integer.binary.java
+      captures:
+        1: punctuation.definition.numeric.binary.java
+        2: storage.type.numeric.long.java
+    - match: |-
+        (?x)
+        \b(0[xX])
+        (?!_)[[:xdigit:]_]*[[:xdigit:]]
+        (?:_*|([Ll])?)\b
+      scope: constant.numeric.integer.hexadecimal.java
+      captures:
+        1: punctuation.definition.numeric.hexadecimal.java
+        2: storage.type.numeric.long.java
+    - match: |-
+        (?x)
+        \b(0)
+        [0-7_]*[0-7]+
+        (?:_*|([Ll])?)\b
+      scope: constant.numeric.integer.octal.java
+      captures:
+        1: punctuation.definition.numeric.octal.java
+        2: storage.type.numeric.long.java
+    - match: |-
+        (?x)
+        \b[1-9](?:[\d_]*\d)?
+        (?:
+          \.(?!_)[\d_]*\d(?:[eE][+-]?(?!_)[\d_]*\d)?(?:_*|([FfDd])?)
+          |
+          [eE][+-]?(?!_)[\d_]*\d(?:_*|([FfDd])?)
+        )\b
+      scope: constant.numeric.float.java
+      captures:
+        1: storage.type.numeric.java
+        2: storage.type.numeric.java
+    - match: |-
+        (?x)
+        \.(?!_)[\d_]*\d(?:[eE][+-]?(?!_)[\d_]*\d)?(?:_*|([FfDd])?)\b
+      scope: constant.numeric.float.java
+      captures:
+        1: storage.type.numeric.java
+    - match: |-
+        (?x)
+          \b(?:0|[1-9](?:[\d_]*\d)?)
+          (?:
+            ([FfDd])
+          )\b
+      scope: constant.numeric.float.java
+      captures:
+        1: storage.type.numeric.java
+    - match: |-
+        (?x)
+          \b(?:0|[1-9](?:[\d_]*\d)?)
+          (?:
+            _*
+            |
+            ([Ll])
+          )?\b
+      scope: constant.numeric.integer.decimal.java
+      captures:
+        1: storage.type.numeric.long.java
   constant-reference:
     - match: '(\.)?(?!{{classes_named_as_constants}})\b([A-Z][A-Z0-9_]+)(?!<|\.class|\s*\w+\s*=)\b'
       scope: constant.other.java
@@ -369,21 +433,30 @@ contexts:
     - match: \b(goto|const)\b
       scope: invalid.illegal.java
   catch-block:
-    - match: \b(catch)\s*\(
+    - match: \b(catch)\s*(\()
+      scope: meta.catch.java
       captures:
         1: keyword.control.catch-exception.java
+        2: punctuation.section.parens.begin.java
       push:
+        - meta_content_scope: meta.catch.parameters.java
         - match: \)
+          scope: meta.catch.java punctuation.section.parens.end.java
           pop: true
+        - match: \|
+          scope: punctuation.separator.java
         - include: parameters
   keywords-control:
-    - match: \b(try|finally|throw)\b
+    - match: \btry\b
+      scope: keyword.control.catch-exception.java
+      push: declaration-statement-parens
+    - match: \b(finally|throw)\b
       scope: keyword.control.catch-exception.java
     - match: \b(return|break|case|continue|default|do|while|switch|if|else)\b
       scope: keyword.control.java
-    - match: \b(for)\b
+    - match: \bfor\b
       scope: keyword.control.java
-      push: for-loop-parens
+      push: declaration-statement-parens
   illegal-open-block:
     - match: \s?(?={)
       scope: invalid.illegal.stray-terminator-end
@@ -560,7 +633,7 @@ contexts:
 
   parens:
     - match: \(
-      scope: punctuation.section.parens.begin.java parens
+      scope: punctuation.section.parens.begin.java
       push:
         - meta_scope: meta.parens.java
         - match: \)
@@ -568,8 +641,7 @@ contexts:
           pop: true
         - include: illegal-parens-terminators
         - include: code
-  for-loop-parens:
-    - meta_scope: for-loop
+  declaration-statement-parens:
     - match: \(
       scope: punctuation.section.parens.begin.java
       set:
@@ -578,7 +650,7 @@ contexts:
           scope: punctuation.section.parens.end.java
           pop: true
         - include: illegal-open-block
-        - include: code
+        - include: code-block
     - include: any_POP
   primitive-arrays:
     - match: '\b(void)((?:\[\])+)'
