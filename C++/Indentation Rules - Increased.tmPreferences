@@ -2,7 +2,7 @@
 <plist version="1.0">
 <dict>
     <key>scope</key>
-    <string>doccomment.block.c++, comment.block.c++</string>
+    <string>comment.block.c++, comment.block.documentation.c++</string>
     <key>settings</key>
     <dict>
         <key>unIndentedLinePattern</key>

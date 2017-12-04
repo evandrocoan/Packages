@@ -46,7 +46,7 @@ contexts:
     - match: /\*\*
       scope: punctuation.definition.comment.c
       push:
-        - meta_scope: doccomment.block.c
+        - meta_scope: comment.block.documentation.c
         - match: \*/
           scope: punctuation.definition.comment.c
           pop: true
@@ -66,7 +66,7 @@ contexts:
     - match: ///
       scope: punctuation.definition.comment.c
       push:
-        - meta_scope: doccomment.line.double-slash.c
+        - meta_scope: comment.line.documentation.triple-slash.c
         - match: '(\\)$\n'
           captures:
             1: punctuation.separator.continuation.c
