@@ -161,7 +161,7 @@ public class SyntaxTest {
 //                      ^^^^^^^^^^^^^ meta.method.identifier entity.name.function.java
 //                                   ^^ meta.method.parameters
 //                                      ^^^^^^^^^^^^^^^^^^^^^^^ meta.method.throws
-//                                      ^^^^^^ storage.modifier.java
+//                                      ^^^^^^ keyword.declaration.throws.java
 //                                                        ^^^^^ meta.generic.java
 //                                                             ^ - meta.method.throws
 //                                                              ^^ meta.method.body.java
@@ -555,6 +555,36 @@ public final class SomeClass<V extends OtherClass, T> extends BaseClass<V> {
 //                                     ^ support.class.java
 //                                                                         ^ punctuation.section.block.begin.java
 }
+
+public @interface PublicAnnotation {
+//     ^^^^^^^^^^ storage.type.java
+  int numericValue() default 42;
+//                   ^^^^^^^ keyword.declaration.default.java
+//                           ^^ constant.numeric
+  boolean booleanValue() default true;
+//                       ^^^^^^^ keyword.declaration.default.java
+//                               ^^^^ constant.language
+  char charValue() default 'S';
+//                 ^^^^^^^ keyword.declaration.default.java
+//                         ^^^ string.quoted.single.java
+  String value() default "Default value";
+//               ^^^^^^^ keyword.declaration.default.java
+//                       ^^^^^^^^^^^^^^^ string.quoted.double.java
+  Class<?> classValue() default String.class;
+//                      ^^^^^^^ keyword.declaration.default.java
+//                              ^^^^^^ support.class.java
+//                                     ^^^^^ variable.language.java
+  String[] arrayValue() default {"Foo", "Bar"};
+//                      ^^^^^^^ keyword.declaration.default.java
+//                              ^ punctuation.section.block.begin
+//                               ^^^^^ string.quoted.double.java
+//                                      ^^^^^ string.quoted.double.java
+//                                           ^ punctuation.section.block.end
+}
+
+@interface PackageAnnotation {}
+//^^^^^^^^ storage.type.java
+
 @MultiLineAnnotation(
 // <- meta.annotation.java
 // <- punctuation.definition.annotation.java
@@ -595,6 +625,51 @@ class Bàr {
 //^^^^^ meta.method.java
 //^^^ entity.name.function.constructor.java
 }
+
+@AnnotationAsParameterSingle(
+    @Parameter(name = "foo")
+//  ^ punctuation.definition.annotation.java
+//   ^^^^^^^^^ variable.annotation.java
+//             ^^^^ variable.parameter.java
+)
+
+@AnnotationAsParameterSingleNamed(
+  value = @Parameter(name = "foo")
+//^^^^^ variable.parameter.java
+//        ^ punctuation.definition.annotation.java
+//         ^^^^^^^^ variable.annotation.java
+//                   ^^^^ variable.parameter.java
+)
+
+@AnnotationAsParameterMultiple({
+//                             ^ punctuation.definition.array-constructor.begin.java
+    @Parameter(name = "foo"),
+//  ^ punctuation.definition.annotation.java
+//   ^^^^^^^^^ variable.annotation.java
+//             ^^^^ variable.parameter.java
+
+    @Parameter(name = "bar")
+//  ^ punctuation.definition.annotation.java
+//   ^^^^^^^^^ variable.annotation.java
+//             ^^^^ variable.parameter.java
+})
+// <- punctuation.definition.array-constructor.end.java
+
+@AnnotationAsParameterMultipleNamed(
+  first  = {@Parameter(name = "foo"), @Parameter(name = "bar")},
+//^^^^^ variable.parameter.java
+//          ^ punctuation.definition.annotation.java
+//           ^^^^^^^^^ variable.annotation.java
+//                     ^^^^ variable.parameter.java
+//                                    ^ punctuation.definition.annotation.java
+//                                     ^^^^^^^^^ variable.annotation.java
+//                                               ^^^^ variable.parameter.java
+  second = {@Parameter(name = "foo"), @Parameter(name = "bar")},
+//^^^^^^ variable.parameter.java
+  third = @Parameter(name = "foo")
+//^^^^^ variable.parameter.java
+//         ^^^^^^^^^ variable.annotation.java
+)
 
 @SomeInterface
 // <- punctuation.definition.annotation.java
@@ -910,6 +985,45 @@ public class Foo {
 //                                  ^ storage.type.numeric
   }
 
+  String stringAndChars() {
+    String doubleQuotes = "String with double quotes";
+//                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ string.quoted.double
+//                        ^ punctuation.definition.string.begin
+//                                                  ^ punctuation.definition.string.end
+
+    char singleQuotes = 'x';
+//                      ^^^ string.quoted.single
+//                      ^ punctuation.definition.string.begin
+//                        ^ punctuation.definition.string.end
+
+    String escapes = "Here \2 are \n some \t escaped \'\\' characters \"";
+//                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ string.quoted.double
+//                         ^^ constant.character.escape
+//                                ^^ constant.character.escape
+//                                                   ^^^^ constant.character.escape
+//                                                                    ^^ constant.character.escape
+
+    char escape = '\t' + '\1' + '\'' + '\\';
+//                ^^^^ string.quoted.single
+//                 ^^ constant.character.escape
+//                       ^^^^ string.quoted.single
+//                        ^^ constant.character.escape
+//                              ^^^^ string.quoted.single
+//                               ^^ constant.character.escape
+//                                     ^^^^ string.quoted.single
+//                                      ^^ constant.character.escape
+
+    String text = "String without closing quote
+//                                             ^ invalid.illegal.newline
+    System.out.println(text);
+//  ^^^^^^ support.class
+
+    char letter = 'z
+//                  ^ invalid.illegal.newline
+    System.out.println(letter);
+//  ^^^^^^ support.class
+  }
+
   @Test
 //^ punctuation.definition.annotation.java
   public void someMethod(WithParam foo) throws Exception {
@@ -918,7 +1032,7 @@ public class Foo {
 //                       ^ support.class.java
 //                                 ^ variable.parameter.java
 //                                      ^^^^^^^^^^^^^^^^ meta.method.throws.java
-//                                      ^^^^^^ storage.modifier.java
+//                                      ^^^^^^ keyword.declaration.throws.java
 //                                             ^^^^^^^^^ support.class.java
 //                                                       ^ meta.method.java meta.method.body.java punctuation.section.block.begin.java
     Object otherFoo = methodInvocation(foo);
@@ -1101,7 +1215,7 @@ public class Foo {
 //                   ^ meta.method.java meta.method.parameters.java variable.parameter.java
 //                      ^ punctuation.section.parens.end
       throws Exception {
-//    ^ meta.method.java meta.method.throws.java storage.modifier.java
+//    ^ meta.method.java meta.method.throws.java keyword.declaration.throws.java
 //           ^ meta.method.java meta.method.throws.java support.class.java
     return someMethod(new Function<V, V>() {
 //                                         ^ meta.class.body.anonymous.java punctuation.section.braces.begin.java

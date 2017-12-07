@@ -15,12 +15,25 @@ variables:
   func_lookahead: '\s*\b(async\s+)?function\b'
   arrow_func_lookahead: '\s*(\basync\s*)?([_$[:alpha:]][_$[:alnum:]]*|\(([^()]|\([^()]*\))*\))\s*=>'
 
-  method_name: >-
+  property_name: >-
     (?x)(?:
       {{identifier}}
       | '(?:[^\\']|\\.)*'
       | "(?:[^\\"]|\\.)*"
       | \[ {{identifier}} (?:\.{{identifier}})* \]
+    )
+
+  class_element_name: |-
+    (?x)(?:
+      {{property_name}}
+      | \#{{identifier}}
+    )
+
+  method_lookahead: |-
+    (?x)(?=
+      \b(?: get|set|async )\b
+      | \*
+      | {{property_name}} \s* \(
     )
 
   line_continuation_lookahead: >-
@@ -175,16 +188,23 @@ contexts:
   export-extended:
     - include: variable-declaration
 
+    - match: (?=\bclass\b)
+      set: class
+
+    - match: (?={{func_lookahead}})
+      set: function-declaration
+
     - match: '\bdefault\b'
       scope: keyword.control.import-export.js
       set:
         - match: (?=\bclass\b)
           set: class
 
-        - match: (?=\bfunction\b)
+        - match: (?={{func_lookahead}})
           set: function-declaration
 
-        - include: expression
+        - match: (?=\S)
+          set: expression-statement
 
     - match: (?=\S)
       set:
@@ -252,13 +272,7 @@ contexts:
     - match: \b(break|continue|goto)\b
       scope: keyword.control.loop.js
 
-    - match: \b(yield)\b(?:\s*(\*))?
-      captures:
-        1: keyword.control.flow.js
-        2: keyword.generator.asterisk.js
-      push: restricted-production
-
-    - match: \b(await|return)\b
+    - match: \breturn\b
       scope: keyword.control.flow.js
       push: restricted-production
 
@@ -276,7 +290,7 @@ contexts:
     - match: (?=\bclass\b)
       push: class
 
-    - match: (?=\bfunction\b)
+    - match: (?={{func_lookahead}})
       push: function-declaration
 
   expression-statement:
@@ -363,8 +377,9 @@ contexts:
     - match: \bfor\b
       scope: keyword.control.loop.js
       push:
-        - meta_scope: meta.for.js
-        - include: parens-block-scope
+        - for-meta
+        - parens-block-scope
+        - for-await
 
     - match: \bwhile\b
       scope: keyword.control.loop.js
@@ -407,6 +422,16 @@ contexts:
       push:
         - meta_scope: meta.catch.js
         - include: parens-block-scope
+
+  for-meta:
+    - meta_scope: meta.for.js
+    - include: immediately-pop
+
+  for-await:
+    - match: \bawait\b
+      scope: keyword.control.loop.js
+      pop: true
+    - include: else-pop
 
   parens-block-scope:
     - match: '\('
@@ -494,6 +519,8 @@ contexts:
     - include: literal-string-template
     - include: constructor
     - include: prefix-operators
+    - include: yield-expression
+    - include: await-expression
 
     - include: class
     - include: constants
@@ -760,6 +787,22 @@ contexts:
     - match: '\+\+'
       scope: keyword.operator.arithmetic.js
 
+  yield-expression:
+    - match: \byield\b
+      scope: keyword.control.flow.js
+      set:
+        - match: $
+          pop: true
+        - match: \*
+          scope: keyword.generator.asterisk.js
+          set: expression-begin
+        - match: (?=\S)
+          set: expression-begin
+
+  await-expression:
+    - match: \bawait\b
+      scope: keyword.control.flow.js
+
   class:
     - match: \bclass\b
       scope: storage.type.class.js
@@ -782,10 +825,69 @@ contexts:
 
   class-body:
     - meta_scope: meta.class.js meta.block.js
+
     - match: '\}'
       scope: punctuation.section.block.js
       pop: true
-    - include: method-declaration
+
+    - match: \;
+      scope: punctuation.terminator.statement.js
+
+    - match: \bconstructor\b
+      scope: entity.name.function.constructor.js
+      push:
+        - function-declaration-expect-body
+        - function-declaration-meta
+        - function-declaration-expect-parameters
+
+    - match: \bstatic\b
+      scope: storage.modifier.js
+      push: class-field
+
+    - match: (?={{class_element_name}})
+      push: class-field
+
+  class-field:
+    - match: '{{method_lookahead}}'
+      set: method-declaration
+      
+    - match: (?={{property_name}})
+      set:
+        - field-initializer-or-method-declaration
+        - field-name
+
+    - match: (?=#{{identifier}})
+      set:
+        - class-field-rest
+        - field-initializer
+        - field-name
+
+    - include: else-pop
+
+  class-field-rest:
+    - match: ','
+      scope: punctuation.separator.js
+      push:
+        - field-initializer
+        - field-name
+    - include: else-pop
+
+  field-initializer:
+    - match: =
+      scope: keyword.operator.assignment.js
+      set: expression-no-comma
+    - include: else-pop
+
+  field-initializer-or-method-declaration:
+    - match: (?=\()
+      set:
+        - function-declaration-expect-body
+        - function-declaration-meta
+        - function-declaration-expect-parameters
+    - match: (?=\S)
+      set:
+        - class-field-rest
+        - field-initializer
 
   constants:
     - match: \btrue\b
@@ -936,6 +1038,7 @@ contexts:
         - function-declaration-meta
         - function-declaration-expect-parameters
         - function-declaration-expect-name
+        - function-declaration-expect-generator-star
         - function-declaration-expect-function-keyword
         - function-declaration-expect-async
 
@@ -957,11 +1060,15 @@ contexts:
       pop: true
     - include: else-pop
 
+  function-declaration-expect-generator-star:
+    - match: \*
+      scope: keyword.generator.asterisk.js
+      pop: true
+    - include: else-pop
+
   function-declaration-expect-function-keyword:
-    - match: \b(function)\b\s*(\*)?
-      captures:
-        1: storage.type.function.js
-        2: keyword.generator.asterisk.js
+    - match: \bfunction\b
+      scope: storage.type.function.js
       pop: true
     - include: else-pop
 
@@ -1075,7 +1182,7 @@ contexts:
 
         - match: >-
             (?x)(?=
-              {{method_name}}\s*:
+              {{property_name}}\s*:
               (?: {{func_lookahead}} | {{arrow_func_lookahead}} )
             )
           push:
@@ -1085,7 +1192,8 @@ contexts:
             - object-literal-meta-key
             - method-name
 
-        - include: method-declaration
+        - match: '{{method_lookahead}}'
+          push: method-declaration
 
         - match: '{{identifier}}(?=\s*(?:[},]|$|//|/\*))'
           scope: variable.other.readwrite.js
@@ -1169,14 +1277,56 @@ contexts:
 
     - include: else-pop
 
+  field-name:
+    - match: '(\$)[_$[:alnum:]]*'
+      scope: meta.object-literal.key.dollar.js variable.other.readwrite.js
+      captures:
+        1: punctuation.dollar.js
+      pop: true
+    - match: '{{identifier}}'
+      scope: variable.other.readwrite.js
+      pop: true
+    - match: "'"
+      scope: punctuation.definition.string.begin.js
+      set:
+        - meta_include_prototype: false
+        - meta_scope: string.quoted.single.js
+        - meta_content_scope: variable.other.readwrite.js
+        - match: (')|(\n)
+          captures:
+            1: punctuation.definition.string.end.js
+            2: invalid.illegal.newline.js
+          pop: true
+        - include: string-content
+    - match: '"'
+      scope: punctuation.definition.string.begin.js
+      set:
+        - meta_include_prototype: false
+        - meta_scope: string.quoted.double.js
+        - meta_content_scope: variable.other.readwrite.js
+        - match: (")|(\n)
+          captures:
+            1: punctuation.definition.string.end.js
+            2: invalid.illegal.newline.js
+          pop: true
+        - include: string-content
+    - match: (#)({{identifier}})
+      captures:
+        1: punctuation.definition.variable.js
+        2: variable.other.readwrite.js
+
+    - match: '(\[)({{identifier}}(?:\.{{identifier}}|\.)*)?(\])?'
+      captures:
+        1: punctuation.definition.symbol.begin.js
+        2: variable.other.readwrite.js
+        3: punctuation.definition.symbol.end.js
+      pop: true
+
+    - include: else-pop
+
   method-declaration:
-    - match: |-
-        (?x)(?=
-          \b(?: get|set|async|static )\b
-          | \*
-          | {{method_name}} \s* \(
-        )
-      push:
+    - match: ''
+      set:
         - function-declaration-expect-body
         - function-declaration-meta
         - function-declaration-expect-parameters
@@ -1188,8 +1338,6 @@ contexts:
       scope: keyword.generator.asterisk.js
     - match: \b(get|set)\b(?!\s*\()
       scope: storage.type.accessor.js
-    - match: \bstatic\b
-      scope: storage.type.js
     - include: else-pop
 
   parenthesized-expression:
@@ -1262,26 +1410,56 @@ contexts:
         - include: object-property
 
   literal-number:
-    - match: '(?i)(?:\B[-+]|\b)0x[0-9a-f]*\.(\B|\b[0-9]+)'
+    - match: '(?i)(?:\B[-+]|\b)0x[0-9a-f_]*\.(\B|\b[0-9_]+)'
       scope: invalid.illegal.numeric.hex.js
       pop: true
-    - match: '(?:\B[-+]|\b)0[0-9]+\.(\B|\b[0-9]+)'
+    - match: '(?:\B[-+]|\b)0[0-9_]+\.(\B|\b[0-9_]+)'
       scope: invalid.illegal.numeric.octal.js
       pop: true
-    - match: |-
-        (?xi)
-        (?:\B[-+])?
-        (?:
-          \b0b[0-1]*|                 # binary
-          \b0o[0-7]*|                 # octal
-          \b0x[0-9a-f]*|              # hex
-          (
-            \B\.[0-9]+|               # e.g. .999
-            \b[0-9]+(\.[0-9]*)?       # e.g. 999.999, 999. or 999
-          )(e[-+]?[0-9]+)?            # e.g. e+123, E-123
-        )
-      scope: constant.numeric.js
+
+    - match: '[+-]?0[0-9]+'
+      scope: constant.numeric.octal.js invalid.deprecated.octal.js
       pop: true
+
+    - match: '[+-]?(0[Xx])[0-9a-fA-F_]*(n)?'
+      scope: constant.numeric.hexadecimal.js
+      captures:
+        1: punctuation.definition.numeric.hexadecimal.js
+        2: storage.type.numeric.bigint.js
+      pop: true
+
+    - match: '[+-]?(0[Oo])[0-7_]*(n)?'
+      scope: constant.numeric.octal.js
+      captures:
+        1: punctuation.definition.numeric.octal.js
+        2: storage.type.numeric.bigint.js
+      pop: true
+
+    - match: '[+-]?(0[Bb])[0-1_]*(n)?'
+      scope: constant.numeric.binary.js
+      captures:
+        1: punctuation.definition.numeric.binary.js
+        2: storage.type.numeric.bigint.js
+      pop: true
+
+    - match: '[+-]?[0-9][0-9_]*(n)'
+      scope: constant.numeric.decimal.js
+      captures:
+        1: storage.type.numeric.bigint.js
+      pop: true
+
+    - match: |-
+        (?x)
+        (?:\B[-+])?
+        (?i:
+          (
+            \B\.[0-9][0-9_]*|         # e.g. .999
+            \b[0-9][0-9_]*(\.[0-9_]*)?# e.g. 999.999, 999. or 999
+          )(e[-+]?[0-9_]*)?           # e.g. e+123, E-123
+        )
+      scope: constant.numeric.decimal.js
+      pop: true
+
     - match: '(?:\B[-+]|\b)(Infinity)\b'
       scope: constant.language.infinity.js
       pop: true
@@ -1435,6 +1613,10 @@ contexts:
     - match: '{{identifier}}'
       scope: variable.other.readwrite.js
       pop: true
+    - match: (#)({{identifier}})
+      captures:
+        1: punctuation.definition.variable.js
+        2: variable.other.readwrite.js
 
   support:
     - match: \bdebugger\b
