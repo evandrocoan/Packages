@@ -6,11 +6,13 @@ comment: I don't think anyone uses .hp. .cp tends to be paired with .h. (I could
 file_extensions:
   - cpp
   - cc
+  - ccg
   - cp
   - cxx
   - c++
   - C
   - h
+  - hg
   - hh
   - hpp
   - hxx
