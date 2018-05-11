@@ -46,6 +46,7 @@ variables:
       (?:\.\d+)?         # precision
       [bcdeEfFgGnosxX%]? # type
     )
+  strftime_spec: '(?:%(?:[aAwdbBGmyYHIpMSfzZjuUVWcxX%]|-[dmHIMSj]))'
 contexts:
   main:
     - include: statements
@@ -611,10 +612,42 @@ contexts:
             - match: '(?=[,)=])'
               set: function-parameters
             - include: expressions
+    - include: function-parameters-tuple
     - include: illegal-names
     - match: '{{identifier}}'
       scope: variable.parameter.python
     - include: line-continuation
+
+  function-parameters-tuple:
+    # python 2 style tuple arguments
+    # removed from python 3 since PEP-3113
+    - match: \(
+      scope: punctuation.section.group.begin.python
+      push:
+        - meta_scope: meta.group.python
+        - match: \)
+          scope: punctuation.section.group.end.python
+          set: after-expression
+        - include: comments
+        - match: ','
+          scope: punctuation.separator.parameters.python
+          push: allow-unpack-operators
+        # default values should follow the argument
+        - match: '(?==)'
+          push:
+            - meta_scope: invalid.illegal.default-value.python
+            - match: '(?=[,)=])'
+              pop: true
+        # python 2 does not support type annotations
+        - match: '(?=:)'
+          push:
+            - meta_scope: invalid.illegal.annotation.python
+            - match: '(?=[,)=])'
+              pop: true
+        - include: illegal-names
+        - match: '{{identifier}}'
+          scope: variable.parameter.python
+        - include: line-continuation
 
   function-after-parameters:
     - meta_content_scope: meta.function.python
@@ -752,6 +785,7 @@ contexts:
       scope: punctuation.separator.parameters.python
       push: allow-unpack-operators
     - include: keyword-arguments
+    - include: function-parameters-tuple
     - include: illegal-names
     - match: '{{identifier}}'
       scope: variable.parameter.python
@@ -1110,7 +1144,7 @@ contexts:
       scope: constant.other.placeholder.python
       captures:
         2: variable.other.placeholder.python
-    - match: '%(?:[aAwdbBGmyYHIpMSfzZjuUVWcxX%]|-[dmHIMSj])'
+    - match: '{{strftime_spec}}'
       scope: constant.other.placeholder.python
     - match: '\{\{|\}\}'
       scope: constant.character.escape.python
@@ -1121,9 +1155,11 @@ contexts:
     - match: |- # simple form
         (?x)
         (\{)
-          (?: [\w.\[\]]+)?         # field_name
-          (   ! [ars])?            # conversion
-          (   : {{format_spec}} )? # format_spec
+          (?: [\w.\[\]]+)?             # field_name
+          (   ! [ars])?                # conversion
+          (   : (?:{{format_spec}}|    # format_spec OR
+                   [^}%]*%.[^}]*)      # any format-like string
+          )?
         (\})
       scope: constant.other.placeholder.python
       captures:
@@ -1789,11 +1825,14 @@ contexts:
     - match: ','
       scope: punctuation.separator.target-list.python
     - match: \(
+      scope: punctuation.section.target-list.begin.python
       push:
         - include: comments
         - match: ','
           scope: punctuation.separator.target-list.python
         - match: \)
+          scope: punctuation.section.target-list.end.python
           pop: true
+        - include: target-list
         - include: name
     - include: name
