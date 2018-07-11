@@ -1,5 +1,14 @@
 /* SYNTAX TEST "Packages/Objective-C/Objective-C.sublime-syntax" */
 
+int main(){
+    int a=5,b=0;
+    while(a-->0)++b;
+    /*     ^^ keyword.operator.arithmetic */
+    /*       ^ keyword.operator.comparison */
+    /*        ^ constant.numeric */
+    /*          ^^ keyword.operator.arithmetic */
+}
+
 #define EXTTS_BUFSIZE (PTP_BUF_TIMESTAMPS /* comment block */ * sizeof(struct ptp_extts_event)) // comment line
 /*^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ meta.preprocessor.macro */
 /*                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ meta.group */
@@ -101,6 +110,50 @@ int f(int x, \
 bool still_C_code_here = true;
 /* <- storage.type */
 /*                       ^ constant.language */
+
+FOOBAR
+hello() {
+    /* <- meta.function entity.name.function */
+    return 0;
+}
+
+EFIAPI
+UserStructCompare (
+  /* <- meta.function entity.name.function */
+  IN CONST VOID *UserStruct1,
+  IN CONST VOID *UserStruct2
+  )
+{
+  const USER_STRUCT *CmpStruct1;
+  /* <- meta.block storage.modifier */
+
+  CmpStruct1 = UserStruct1;
+  return KeyCompare (&CmpStruct1->Key, UserStruct2);
+  /* <- meta.block keyword.control */
+  /*              ^ meta.block meta.function-call variable.function */
+}
+
+LIB_RESULT
+foo()
+/* <- meta.function entity.name.function */
+{
+   return LIB_SUCCESS;
+}
+
+LIB_RESULT bar()
+/*           ^ meta.function entity.name.function */
+{
+    return LIB_SUCCESS;
+}
+
+THIS_IS_REALLY_JUST_A_MACRO_AND_NOT_A_RETURN_TYPE
+/* <- meta.assumed-macro */
+
+int main() {
+/* <- storage.type */
+    /* ^ meta.function entity.name.function */
+    return 0;
+}
 
 #if 0
 #ifdef moo
@@ -298,6 +351,7 @@ int foo(int val, float val2[])
 /*        ^^ punctuation.accessor */
     if (result == 0) {
         return 0;
+/*      ^^^^^^ keyword.control.flow.return */
 #if CROSS_SCOPE_MACRO
  /* <- keyword.control.import */
     } else if (result > 0) {
@@ -401,6 +455,7 @@ MACRO1 void * MACRO2 myfuncname () {
 /*       ^ punctuation.separator */
         do {
             break;
+/*          ^^^^^ keyword.control.flow.break */
         } while(true);
 
     switch (a) {
