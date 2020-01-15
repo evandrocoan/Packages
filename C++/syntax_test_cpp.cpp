@@ -665,7 +665,7 @@ void f()
     x /**/ . /**/ foo <5> /**/ () /**/ ;
     /*^^^^ comment.block.documentation */
     /*     ^ punctuation.accessor - comment.block.documentation */
-    /*            ^^^ meta.method-call variable.function *
+    /*            ^^^ meta.method-call variable.function */
     /*               ^ meta.method-call - variable.function */
     /*                ^ meta.method-call punctuation.section.generic.begin */
     /*                  ^ meta.method-call punctuation.section.generic.end */

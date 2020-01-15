@@ -43,6 +43,9 @@ contexts:
       scope: comment.block.c
       captures:
         1: meta.toc-list.banner.block.c
+    - match: /\*\*/
+      scope: comment.block.documentation.c punctuation.definition.comment.c
+
     - match: /\*\[\[\[cog
       scope: comment.block.c punctuation.definition.comment.c
       embed: scope:source.python
